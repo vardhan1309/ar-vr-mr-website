@@ -1,57 +1,112 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>Enscape 360 Architecture Tour</title>
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script>
-      // Custom A-Frame component to handle room switching
-      AFRAME.registerComponent('hotspot', {
-        schema: { targetRoom: {type: 'string'} },
-        init: function () {
-          let el = this.el;
-          let data = this.data;
-          
-          // UX Feedback: Scale up when hovered
-          el.addEventListener('mouseenter', function () {
-            el.setAttribute('scale', '1.2 1.2 1.2');
-          });
-          // UX Feedback: Return to normal when raycaster leaves
-          el.addEventListener('mouseleave', function () {
-            el.setAttribute('scale', '1 1 1');
-          });
-          
-          // Action: Change the 360 image on click
-          el.addEventListener('click', function () {
-            document.querySelector('#main-sky').setAttribute('src', data.targetRoom);
-          });
-        }
-      });
-    </script>
-  </head>
-  <body>
-    <!-- Setup scene and allow mouse testing on PC before using VR headset -->
-    <a-scene cursor="rayOrigin: mouse">
-      
-      <!-- Preload Enscape Panoramas -->
-      <a-assets>
-        <!-- Ensure you upload your exported JPGs to this relative path -->
-        <img id="livingRoom" src="assets/panoramas/living_room.jpg">
-        <img id="kitchen" src="assets/panoramas/kitchen.jpg">
-      </a-assets>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Architecture VR Tour - Meta Quest</title>
+  <!-- Load A-Frame for WebXR -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  
+  <script>
+    // CUSTOM COMPONENT: Fade-to-Black Transition & Hotspot Logic
+    AFRAME.registerComponent('tour-hotspot', {
+      schema: { target: { type: 'string' } },
+      init: function () {
+        const el = this.el;
+        const data = this.data;
+        
+        // UX Feedback: Scale up on hover so user knows it is clickable
+        el.addEventListener('mouseenter', () => {
+          el.setAttribute('scale', '1.2 1.2 1.2');
+        });
+        el.addEventListener('mouseleave', () => {
+          el.setAttribute('scale', '1 1 1');
+        });
 
-      <!-- The 360 Panorama Sphere -->
-      <a-sky id="main-sky" src="#livingRoom"></a-sky>
+        // Action: Handle the click and transition
+        el.addEventListener('click', () => {
+          const sky = document.querySelector('#main-sky');
+          const fader = document.querySelector('#fader');
 
-      <!-- Meta Quest Controllers with Laser Pointers -->
-      <a-entity laser-controls="hand: left" raycaster="objects: .clickable"></a-entity>
-      <a-entity laser-controls="hand: right" raycaster="objects: .clickable"></a-entity>
-      
-      <!-- Camera locked at standard human height -->
-      <a-camera position="0 1.6 0"></a-camera>
+          // 1. Fade to black (opacity 0 to 1) over 400ms
+          fader.setAttribute('animation', 'property: material.opacity; to: 1; dur: 400; easing: easeInOutQuad');
 
-      <!-- Interactive Waypoint to move to the Kitchen -->
-      <a-sphere class="clickable" color="#4CC3D9" radius="0.2" position="2 1.6 -4" hotspot="targetRoom: #kitchen"></a-sphere>
-      
-    </a-scene>
-  </body>
+          // 2. Wait for fade, swap 360 image, then fade back in
+          setTimeout(() => {
+            sky.setAttribute('src', data.target);
+            
+            // Fade back in (opacity 1 to 0)
+            fader.setAttribute('animation', 'property: material.opacity; to: 0; dur: 400; easing: easeInOutQuad');
+          }, 400); // 400ms delay matches the fade out duration
+        });
+      }
+    });
+  </script>
+</head>
+<body>
+  <!-- Scene setup with raycaster allowing mouse clicks on PC, and laser pointers in VR -->
+  <a-scene cursor="rayOrigin: mouse" raycaster="objects: .clickable">
+    
+    <!-- ASSET MANAGER: Preload your Enscape renders here -->
+    <a-assets>
+      <!-- Replace the placeholder URLs with your local paths like: src="assets/living_room.jpg" -->
+      <img id="view-livingroom" src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=4096" crossorigin="anonymous">
+      <img id="view-kitchen" src="https://images.unsplash.com/photo-1556910103-1c02745a872f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=4096" crossorigin="anonymous">
+      <img id="floorplan-img" src="https://images.unsplash.com/photo-1600607688969-a5bfcd646154?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080" crossorigin="anonymous">
+    </a-assets>
+
+    <!-- THE 360 ENVIRONMENT -->
+    <a-sky id="main-sky" src="#view-livingroom" rotation="0 -90 0"></a-sky>
+
+    <!-- CAMERA & VR CONTROLS RIG -->
+    <a-entity id="rig" position="0 1.6 0"> <!-- 1.6m is standard human eye level -->
+      <a-camera id="camera" look-controls="reverseMouseDrag: true">
+        <!-- The Fader: A tiny black sphere attached to the camera, initially invisible -->
+        <a-sphere id="fader" radius="0.1" position="0 0 -0.1" 
+                  material="color: black; opacity: 0; transparent: true; shader: flat; side: back">
+        </a-sphere>
+      </a-camera>
+
+      <!-- Meta Quest Hand Controllers with lasers -->
+      <a-entity laser-controls="hand: left" raycaster="objects: .clickable; far: 20"></a-entity>
+      <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 20"></a-entity>
+    </a-entity>
+
+    <!-- UI ELEMENT 1: Spatial Waypoint (Matterport Style) -->
+    <!-- Position this manually in your scene over a doorway -->
+    <a-entity class="clickable" position="3 1.5 -3" rotation="0 -45 0" tour-hotspot="target: #view-kitchen">
+      <!-- Outer Ring -->
+      <a-ring radius-inner="0.2" radius-outer="0.25" material="color: white; opacity: 0.8; transparent: true" shader="flat"></a-ring>
+      <!-- Inner Solid Circle -->
+      <a-circle radius="0.15" material="color: #4CC3D9; opacity: 0.9; transparent: true" shader="flat"></a-circle>
+      <!-- Floating Label -->
+      <a-text value="Go to Kitchen" align="center" position="0 0.35 0" scale="0.6 0.6 0.6" color="#ffffff"></a-text>
+    </a-entity>
+
+    <!-- UI ELEMENT 2: Glassmorphic Info Panel (Kuula Style) -->
+    <!-- Floating to the left side of the user's view -->
+    <a-entity position="-2 1.5 -2.5" rotation="0 30 0">
+      <!-- Semi-transparent Frosted Glass Background -->
+      <a-plane width="1.5" height="0.8" material="color: #ffffff; opacity: 0.15; transparent: true; shader: flat"></a-plane>
+      <!-- Thin crisp border -->
+      <a-plane width="1.52" height="0.82" position="0 0 -0.01" material="color: #ffffff; opacity: 0.4; transparent: true; shader: flat"></a-plane>
+      <!-- Panel Text -->
+      <a-text value="Project Details" position="-0.6 0.2 0.01" color="#ffffff" scale="0.6 0.6 0.6"></a-text>
+      <a-text value="Client: Architecture Studio\nType: Enscape VR Render\nSoftware: A-Frame WebXR" 
+              position="-0.6 -0.1 0.01" color="#ffffff" scale="0.35 0.35 0.35" line-height="60"></a-text>
+    </a-entity>
+
+    <!-- UI ELEMENT 3: Floorplan Minimap (Momento360 Style) -->
+    <!-- Placed low like a map on a table -->
+    <a-entity position="0 0.9 -2" rotation="-20 0 0">
+       <a-plane src="#floorplan-img" width="1.2" height="0.8" material="opacity: 0.9; transparent: true"></a-plane>
+       <a-text value="Floorplan" position="-0.5 0.5 0" color="#ffffff" scale="0.4 0.4 0.4"></a-text>
+       <!-- "You are here" indicator blip -->
+       <a-circle position="0.1 -0.1 0.01" radius="0.04" material="color: #FF3366; shader: flat">
+          <!-- Pulse animation for the blip -->
+          <a-animation attribute="scale" to="1.3 1.3 1.3" direction="alternate" dur="800" repeat="indefinite"></a-animation>
+       </a-circle>
+    </a-entity>
+
+  </a-scene>
+</body>
 </html>
